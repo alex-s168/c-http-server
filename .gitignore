@@ -1,0 +1,6 @@
+core
+out
+*.out
+build
+*.exe
+*.pch
