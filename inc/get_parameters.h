@@ -15,7 +15,7 @@ printf("mail: %s\n", params[1]);
 #include <string.h>
 
 // "/a/b?x=y" -> "x=y"
-static char *urlGETStart(char *path) {
+static const char *urlGETStart(const char *path) {
   while (*path != '\0') {
     if (*path == '?')
       return path + 1;
@@ -58,7 +58,7 @@ static int urlGETNext(struct urlGETParam *ptr, char *start) {
 
 // "temp" needs to be the size of "len" and initialized with zeros
 static void urlGETAll(char *path, char **dest, int len, int *temp) {
-  char *start = urlGETStart(path);
+  char *start = (char*) urlGETStart(path);
   struct urlGETParam param;
   urlGETPrepare(&param);
   while (urlGETNext(&param, start)) {

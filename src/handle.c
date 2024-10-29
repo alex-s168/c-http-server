@@ -160,7 +160,7 @@ int http__handle_connection(ServerConnection* con) {
     fprintf(fp, "HTTP/1.1 %i %s\r\n", response.status, response.status_msg);
     if (response._internal_optional_encoding != NULL)
         fprintf(fp, "Content-Encoding: %s\r\n", response._internal_optional_encoding);
-    fprintf(fp, "Content-Type: %s\r\n", response.content_type);
+    fprintf(fp, "Content-Type: %s; charset=UTF-8\r\n", response.content_type);
     fprintf(fp, "Content-Length: %zu\r\n\r\n", response.content_size);
     fwrite(response.content, 1, response.content_size, fp);
 

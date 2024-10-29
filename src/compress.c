@@ -72,13 +72,13 @@ static char* server_zstd_compress(const char* input, size_t inputSize, size_t* l
 
 CompressAlgo http__compressAlgo[] =
 {
-#ifdef HAS_ZLIB
-    { .name = "gzip", .compress = server_gzip_compress },
-#endif 
-
 #ifdef HAS_ZSTD
     { .name = "zstd", .compress = server_zstd_compress },
 #endif
+
+#ifdef HAS_ZLIB
+    { .name = "gzip", .compress = server_gzip_compress },
+#endif 
 
     { 0 }
 };
