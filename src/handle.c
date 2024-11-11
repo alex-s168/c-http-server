@@ -71,10 +71,20 @@ int http__handle_connection(ServerConnection* con) {
     }
 
     char *path = strchr(line0, ' ');
+    if (path == NULL) {
+        ERRF("in request: invalid line 0");
+        fclose(fp);
+        return 1;
+    }
     *path = '\0';
     path++;
     const char *method_str = line0;
     char *path_end = strrchr(path, ' ');
+    if (path_end == NULL) {
+        ERRF("in request: invalid line 0");
+        fclose(fp);
+        return 1;   
+    }
     *path_end = '\0';
 
     enum HttpMethod method;
