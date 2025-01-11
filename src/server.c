@@ -104,7 +104,7 @@ Http* http_open(HttpCfg cfg, void* userdata)
 void http_tick(Http* server)
 {
     if (server->enq_con >= server->cfg.max_enq_con) {
-        usleep((__useconds_t) server->cfg.con_sleep_us);
+        usleep((useconds_t) server->cfg.con_sleep_us);
         return;
     }
 
@@ -115,7 +115,7 @@ void http_tick(Http* server)
                                 &client_addr_len);
     if (connection_fd == -1) {
         if (errno == EWOULDBLOCK) {
-            usleep((__useconds_t) server->cfg.con_sleep_us);
+            usleep((useconds_t) server->cfg.con_sleep_us);
         }
     }
     else {
