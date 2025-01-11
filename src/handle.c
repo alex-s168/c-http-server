@@ -140,30 +140,32 @@ int http__handle_connection(ServerConnection* con) {
         con->server->cfg.handler(request, con->server->userdata);
     response._internal_optional_encoding = NULL;
 
-    for (size_t i = 0; ; i ++) {
-        CompressAlgo algo = http__compressAlgo[i];
-        if (algo.name == NULL) break;
+    if (response.content_mode == HTTP_CONTENT_BYTES) {
+        for (size_t i = 0; ; i ++) {
+            CompressAlgo algo = http__compressAlgo[i];
+            if (algo.name == NULL) break;
 
-        if (server_has_encoding(request, algo.name))
-        {
-            size_t compuz;
-            char* comp = algo.compress(response.content,
-                                       response.content_size,
-                                       &compuz);
+            if (server_has_encoding(request, algo.name))
+            {
+                size_t compuz;
+                char* comp = algo.compress(response.content_val.bytes.content,
+                                           response.content_size,
+                                           &compuz);
 
-            if (comp == NULL) {
-                WARNF("not enough memory for compressing response");
+                if (comp == NULL) {
+                    WARNF("not enough memory for compressing response");
+                    break;
+                }
+
+                response._internal_optional_encoding = algo.name;
+                if (response.content_val.bytes.free_after)
+                    free((char*) response.content_val.bytes.free_after);
+                response.content_val.bytes.content = comp;
+                response.content_size = compuz;
+                response.content_val.bytes.free_after = true;
+
                 break;
             }
-
-            response._internal_optional_encoding = algo.name;
-            if (response.free_content)
-                free((char*) response.content);
-            response.content = comp;
-            response.content_size = compuz;
-            response.free_content = true;
-
-            break;
         }
     }
 
@@ -172,14 +174,44 @@ int http__handle_connection(ServerConnection* con) {
         fprintf(fp, "Content-Encoding: %s\r\n", response._internal_optional_encoding);
     fprintf(fp, "Content-Type: %s; charset=UTF-8\r\n", response.content_type);
     fprintf(fp, "Content-Length: %zu\r\n\r\n", response.content_size);
-    fwrite(response.content, 1, response.content_size, fp);
+
+    switch (response.content_mode)
+    {
+        case HTTP_CONTENT_BYTES: {
+            fwrite(response.content_val.bytes.content, 1, response.content_size, fp);
+            if (response.content_val.bytes.free_after)
+                free((void*) response.content_val.bytes.content);
+        } break;
+
+        case HTTP_CONTENT_ITER: {
+            char* buf;
+            size_t len;
+            while ((buf = response.content_val.iter.next(&len, response.content_val.iter.userptr)) != NULL)
+            {
+                fwrite(buf, 1, len, fp);
+                free(buf);
+            }
+        } break;
+
+        case HTTP_CONTENT_FILE: {
+            char buf[1028];
+            size_t rem = response.content_size;
+            while (rem > 1028)
+            {
+                fread(buf, 1, 1028, response.content_val.file.fp);
+                fwrite(buf, 1, 1028, fp);
+                rem -= 1028;
+            }
+            fread(buf, 1, rem, response.content_val.file.fp);
+            fwrite(buf, 1, rem, fp);
+            if (response.content_val.file.close_after)
+                fclose(response.content_val.file.fp);
+        } break;
+    }
 
     fclose(fp);
 
     free(line0);
-
-    if (response.free_content)
-        free((char*) response.content);
 
     if (headers) {
         for (size_t i = 0; i < headers_size; i++)

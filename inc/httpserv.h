@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <stdio.h>
 
 enum HttpMethod {
     GET,
@@ -11,13 +12,46 @@ enum HttpMethod {
     UNKNOWN
 };
 
+typedef enum {
+    HTTP_CONTENT_BYTES,
+
+    /** compression is currently not supported for this */
+    HTTP_CONTENT_ITER,
+
+    /** compression is currently not supported for this */
+    HTTP_CONTENT_FILE,
+} HttpContentMode;
+
+typedef struct {
+    const char *content;
+    bool free_after;
+} HttpBytesContent;
+
+typedef struct {
+    /** fread()s in chunks until content_size is reached */
+    FILE* fp;
+    bool close_after;
+} HttpFileContent;
+
+typedef struct {
+    void* userptr;
+
+    /** returns heap allocated byte arr; if returns NULL, end of data */
+    char* (*next)(size_t* lenout, void* userptr);
+} HttpIterContent;
+
 struct HttpResponse {
     int status;
     const char *status_msg;
     const char *content_type;
-    const char *content;
+
     size_t content_size;
-    bool free_content;
+    HttpContentMode content_mode;
+    union {
+        HttpBytesContent bytes;
+        HttpIterContent iter;
+        HttpFileContent file;
+    } content_val;
 
     const char *_internal_optional_encoding;
 };
@@ -71,5 +105,8 @@ void http_close(Http* server);
 
 void http_slowlyStop(Http* server);
 bool http_isStopping(Http* server);
+
+/** chechks the extension of path; if it can't figure it out, always defaults to text/plain */
+const char* http_detectMime(const char* path);
 
 #endif
