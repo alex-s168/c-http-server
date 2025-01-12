@@ -104,9 +104,7 @@ Http* http_open(HttpCfg cfg, void* userdata);
 /** accept new connection in thread or wait [cfg.con_sleep_us] */
 void http_tick(Http* server);
 
-/** wait for all current connections to be processed */
-void http_wait(Http* server);
-
+/** waits for all cons to be processed */
 void http_close(Http* server);
 
 void http_slowlyStop(Http* server);

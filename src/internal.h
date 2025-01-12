@@ -1,6 +1,6 @@
 #define DEF_LOG
 #include "../inc/httpserv.h"
-#include "../C-Thread-Pool/thpool.h"
+#include "../thread-pool/threadpool.h"
 #include <stdatomic.h>
 #include <stdlib.h>
 
@@ -30,7 +30,7 @@ struct Http {
     HttpCfg cfg;
 
     bool running;
-    threadpool pool;
+    threadpool_t* pool;
 
     int server_fd;
 

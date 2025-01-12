@@ -7,7 +7,6 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <errno.h>
-#include "../C-Thread-Pool/thpool.h"
 #include "internal.h"
 
 const char *http_header_get(struct HttpRequest const* request, const char *name) {
@@ -39,7 +38,10 @@ Http* http_open(HttpCfg cfg, void* userdata)
     server->cfg = cfg;
     server->userdata = userdata;
 
-    server->pool = thpool_init(cfg.num_threads);
+    if (cfg.num_threads > MAX_THREADS)
+        cfg.num_threads = MAX_THREADS;
+
+    server->pool = threadpool_create(cfg.num_threads, cfg.max_enq_con, 0);
     if (server->pool == NULL) {
         ERRF("Out of memory");
         free(server);
@@ -49,7 +51,7 @@ Http* http_open(HttpCfg cfg, void* userdata)
     server->server_fd = socket(AF_INET, SOCK_STREAM, 0);
 	if (server->server_fd == -1) {
 	    ERRF("Socket creation failed: %s...", strerror(errno));
-        thpool_destroy(server->pool);
+        threadpool_destroy(server->pool, 0);
         free(server);
         return NULL;
 	}
@@ -60,7 +62,7 @@ Http* http_open(HttpCfg cfg, void* userdata)
     if (flags == -1) {
         ERRF("Could not set socket to non-blocking: %s", strerror(errno));
         close(server->server_fd);
-        thpool_destroy(server->pool);
+        threadpool_destroy(server->pool, 0);
         free(server);
         return NULL;
     }
@@ -68,7 +70,7 @@ Http* http_open(HttpCfg cfg, void* userdata)
 	if (setsockopt(server->server_fd, SOL_SOCKET, SO_REUSEPORT, &cfg.reuse, sizeof(cfg.reuse)) < 0) {
         ERRF("SO_REUSEPORT failed: %s", strerror(errno));
         close(server->server_fd);
-        thpool_destroy(server->pool);
+        threadpool_destroy(server->pool, 0);
         free(server);
         return NULL;
 	}
@@ -82,7 +84,7 @@ Http* http_open(HttpCfg cfg, void* userdata)
 	if (bind(server->server_fd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) != 0) {
 	    ERRF("Bind failed: %s", strerror(errno));
         close(server->server_fd);
-        thpool_destroy(server->pool);
+        threadpool_destroy(server->pool, 0);
         free(server);
 	    return NULL;
 	}
@@ -91,7 +93,7 @@ Http* http_open(HttpCfg cfg, void* userdata)
 	if (listen(server->server_fd, connection_backlog) != 0) {
 	    ERRF("Listen failed: %s", strerror(errno));
         close(server->server_fd);
-        thpool_destroy(server->pool);
+        threadpool_destroy(server->pool, 0);
         free(server);
 	    return NULL;
 	}
@@ -118,6 +120,7 @@ void http_tick(Http* server)
             usleep((useconds_t) server->cfg.con_sleep_us);
         }
     }
+    // TODO: extend thread pool to get queue fill amount and sleep if full-ish
     else {
         server->enq_con ++;
         ServerConnection* con = malloc(sizeof(ServerConnection));
@@ -128,21 +131,15 @@ void http_tick(Http* server)
         else {
             con->server = server;
             con->fd = connection_fd;
-            thpool_add_work(server->pool, handle_task, con);
+            threadpool_add(server->pool, handle_task, con, 0);
         }
     }
-}
-
-/** wait for all current connections to be processed */
-void http_wait(Http* server)
-{
-    thpool_wait(server->pool);
 }
 
 void http_close(Http* server)
 {
     close(server->server_fd);
-    thpool_destroy(server->pool);
+    threadpool_destroy(server->pool, 0);
     free(server);
 }
 
