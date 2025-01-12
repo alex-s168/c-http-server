@@ -20,25 +20,24 @@ For a more advanced example, see `example.c`.
 static struct HttpResponse serve(struct HttpRequest request, void* userdata) {
     (void) userdata;
 
-    struct HttpResponse r = (struct HttpResponse) {
-        .status = 404,
-        .status_msg = "Not Found",
-        .content_type = "text/plain",
-        .content = "Page not found!",
-        .content_size = SIZE_MAX,
-        .free_content = false,
-    };
-
     if (memcmp(request.path, "/echo/", 6) == 0)
     {
-        r.status = 200;
-        r.status_msg = "OK";
-        r.content_type = "text/plain";
-        r.content = request.path + 6;
+        return (struct HttpResponse) {
+            .status = 200,
+            .status_msg = "OK",
+            .content_type = "text/plain",
+            HTTP_RESPONSE_TEXT(request.path + 6)
+        };
     }
-
-    if (r.content_size == SIZE_MAX)
-        r.content_size = strlen(r.content);
+    else
+    {
+        return (struct HttpResponse) {
+            .status = 404,
+            .status_msg = "Not Found",
+            .content_type = "text/plain",
+            HTTP_RESPONSE_TEXT("Page not found!")
+        };
+    }
 
     return r;
 }

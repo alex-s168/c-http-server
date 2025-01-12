@@ -159,7 +159,7 @@ int http__handle_connection(ServerConnection* con) {
 
                 response._internal_optional_encoding = algo.name;
                 if (response.content_val.bytes.free_after)
-                    free((char*) response.content_val.bytes.free_after);
+                    free((char*) response.content_val.bytes.content);
                 response.content_val.bytes.content = comp;
                 response.content_size = compuz;
                 response.content_val.bytes.free_after = true;

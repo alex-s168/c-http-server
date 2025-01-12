@@ -10,63 +10,83 @@ static char* server_gzip_compress(const char* input, size_t inputSize, size_t *l
     zs.zalloc = Z_NULL;
     zs.zfree = Z_NULL;
     zs.opaque = Z_NULL;
-    zs.avail_in = (uInt)inputSize;
-    zs.next_in = (Bytef *)input;
 
-    size_t outputSize = 512;
+    if (deflateInit2(&zs, Z_DEFAULT_COMPRESSION, Z_DEFLATED, 15 | 16, 8, Z_DEFAULT_STRATEGY) != Z_OK) {
+        return NULL;
+    }
+
+    zs.avail_in = (uInt)inputSize;
+    zs.next_in = (Bytef*)input;
+
+    size_t outputSize = CHUNK;
     char* output = malloc(outputSize);
-    if (output == NULL) return NULL;
+    if (output == NULL) {
+        deflateEnd(&zs);
+        return NULL;
+    }
+
+    size_t totalOut = 0;
 
     do {
-        zs.avail_out = (uInt)outputSize;
-        zs.next_out = (Bytef *)output;
+        zs.avail_out = (uInt)(outputSize - totalOut);
+        zs.next_out = (Bytef*)(output + totalOut);
 
-        deflateInit2(&zs, Z_DEFAULT_COMPRESSION, Z_DEFLATED, 15 | 16, 8, Z_DEFAULT_STRATEGY);
-        deflate(&zs, Z_FINISH);
-        deflateEnd(&zs);
+        int ret = deflate(&zs, Z_FINISH);
+        if (ret != Z_OK && ret != Z_STREAM_END) {
+            free(output);
+            deflateEnd(&zs);
+            return NULL;
+        }
 
-        if (zs.total_out == 0) {
+        totalOut = zs.total_out;
+
+        if (zs.avail_out == 0) {
             outputSize *= 2;
-            void* new = realloc(output, outputSize);
-            if (new == NULL) {
+            char* newOutput = realloc(output, outputSize);
+            if (newOutput == NULL) {
                 free(output);
+                deflateEnd(&zs);
                 return NULL;
             }
-            output = new;
+            output = newOutput;
         }
-    } while (zs.total_out == 0);
+    } while (zs.avail_out == 0);
 
-    *lenOut = zs.total_out;
+    deflateEnd(&zs);
+
+    *lenOut = totalOut;
     return output;
 }
 #endif
 
 #ifdef HAS_ZSTD
 #include <zstd.h>
-static char* server_zstd_compress(const char* input, size_t inputSize, size_t* lenOut)
-{
+static char* server_zstd_compress(const char* input, size_t inputSize, size_t* lenOut) {
+    if (input == NULL || lenOut == NULL) return NULL;
+
     size_t outputSize = 512;
     char* output = malloc(outputSize);
     if (output == NULL) return NULL;
 
-    size_t actual = 0;
-    do {
-        actual = ZSTD_compress(output, outputSize, input, inputSize, ZSTD_CLEVEL_DEFAULT);
-        if (ZSTD_isError(actual)) {
-            outputSize *= 2;
-            void* new = realloc(output, outputSize);
-            if (new == NULL) {
-                free(output);
-                return NULL;
-            }
-            output = new;
-
-            actual = 0;
+    while (1) {
+        size_t actual = ZSTD_compress(output, outputSize, input, inputSize, ZSTD_CLEVEL_DEFAULT);
+        if (!ZSTD_isError(actual)) {
+            *lenOut = actual;
+            return output;
         }
-    } while (actual == 0);
 
-    *lenOut = actual;
-    return output;
+        size_t newOutputSize = outputSize * 2;
+        if (newOutputSize > inputSize * 2)
+            return NULL;
+        void* newOutput = realloc(output, newOutputSize);
+        if (newOutput == NULL) {
+            free(output);
+            return NULL;
+        }
+
+        output = newOutput;
+        outputSize = newOutputSize;
+    }
 }
 #endif
 

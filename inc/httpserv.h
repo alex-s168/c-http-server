@@ -40,6 +40,12 @@ typedef struct {
     char* (*next)(size_t* lenout, void* userptr);
 } HttpIterContent;
 
+/** sets content_mode, content_size and content_val to represent the input string */
+#define HTTP_RESPONSE_TEXT(str) \
+    .content_val.bytes = (HttpBytesContent) { .content = (str), .free_after = false }, \
+    .content_size = strlen(str), \
+    .content_mode = HTTP_CONTENT_BYTES,
+
 struct HttpResponse {
     int status;
     const char *status_msg;
@@ -108,5 +114,7 @@ bool http_isStopping(Http* server);
 
 /** chechks the extension of path; if it can't figure it out, always defaults to text/plain */
 const char* http_detectMime(const char* path);
+
+size_t http_urldecode(char *dst, size_t dstlen, const char *src);
 
 #endif
