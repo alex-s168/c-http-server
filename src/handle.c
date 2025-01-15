@@ -57,6 +57,8 @@ static bool server_has_encoding(struct HttpRequest request, const char *name) {
     return false;
 }
 
+#define FILE_CHUNK_SIZE (1028 * 8)
+
 int http__handle_connection(ServerConnection* con) {
     FILE *fp = fdopen(con->fd, "r+");
     if (fp == NULL) {
@@ -194,13 +196,13 @@ int http__handle_connection(ServerConnection* con) {
         } break;
 
         case HTTP_CONTENT_FILE: {
-            char buf[1028];
+            char buf[FILE_CHUNK_SIZE];
             size_t rem = response.content_size;
-            while (rem > 1028)
+            while (rem >= FILE_CHUNK_SIZE)
             {
-                fread(buf, 1, 1028, response.content_val.file.fp);
-                fwrite(buf, 1, 1028, fp);
-                rem -= 1028;
+                fread(buf, 1, FILE_CHUNK_SIZE, response.content_val.file.fp);
+                fwrite(buf, 1, FILE_CHUNK_SIZE, fp);
+                rem -= FILE_CHUNK_SIZE;
             }
             fread(buf, 1, rem, response.content_val.file.fp);
             fwrite(buf, 1, rem, fp);

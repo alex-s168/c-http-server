@@ -43,7 +43,7 @@ Http* http_open(HttpCfg cfg, void* userdata)
 
     server->pool = threadpool_create(cfg.num_threads, cfg.max_enq_con, 0);
     if (server->pool == NULL) {
-        ERRF("Out of memory");
+        ERRF("Could not create thread pool. Out of memory?");
         free(server);
         return NULL;
     }
