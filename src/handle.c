@@ -89,6 +89,10 @@ int http__handle_connection(ServerConnection* con) {
     }
     *path_end = '\0';
 
+    while (path[0] == '/' && path[1] == '/') {
+        path ++;
+    }
+
     enum HttpMethod method;
     if (strcmp(method_str, "GET") == 0) {
         method = GET;
