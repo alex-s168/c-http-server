@@ -34,10 +34,15 @@ typedef struct {
 } HttpFileContent;
 
 typedef struct {
-    void* userptr;
+    bool free_ptr;
+    char* ptr;
+    size_t len; // or 0 to indicate end of data
+    void* new_userptr;
+} HttpIterRes;
 
-    /** returns heap allocated byte arr; if returns NULL, end of data */
-    char* (*next)(size_t* lenout, void* userptr);
+typedef struct {
+    void* userptr;
+    HttpIterRes (*next)(void* userptr);
 } HttpIterContent;
 
 /** sets content_mode, content_size and content_val to represent the input string */

@@ -190,13 +190,14 @@ int http__handle_connection(ServerConnection* con) {
         } break;
 
         case HTTP_CONTENT_ITER: {
-            char* buf;
-            size_t len;
-            while ((buf = response.content_val.iter.next(&len, response.content_val.iter.userptr)) != NULL)
-            {
-                fwrite(buf, 1, len, fp);
-                free(buf);
-            }
+            HttpIterRes it;
+            do {
+                it = response.content_val.iter.next(response.content_val.iter.userptr);
+                fwrite(it.ptr, 1, it.len, fp);
+                if (it.free_ptr && it.ptr)
+                    free(it.ptr);
+                response.content_val.iter.userptr = it.new_userptr;
+            } while (it.len);
         } break;
 
         case HTTP_CONTENT_FILE: {
