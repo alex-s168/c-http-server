@@ -1,6 +1,8 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
+#include <arpa/inet.h>
+#include <netdb.h>
 #include <pthread.h>
 #include <string.h>
 #include <threads.h>
@@ -26,8 +28,52 @@ static void handle_task(void* _con)
     free(con);
 }
 
+static int ipaddr(struct sockaddr_in* out, char const* addrIn)
+{
+    char addr[128];
+    strncpy(addr, addrIn, 128);
+
+    struct addrinfo hints = {0};
+    struct addrinfo *res;
+
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+
+    char* colon = strrchr(addr, ':');
+    if (!colon) return 1;
+    *colon = '\0';
+    char const* port = colon + 1;
+
+    if ( getaddrinfo(addr, port, &hints, &res) )
+        return 1;
+
+    for (struct addrinfo* r = res; r; r = r->ai_next)
+    {
+        if (r->ai_family == AF_INET)
+        {
+            struct sockaddr_in *saddr = (struct sockaddr_in *) r->ai_addr;
+            memcpy(out, saddr, sizeof(*saddr));
+            return 0;
+        }
+        freeaddrinfo(r);
+    }
+
+    return 1;
+}
+
 Http* http_open(HttpCfg cfg, void* userdata)
 {
+    if (cfg.bind == NULL) {
+        ERRF("HttpCfg.bind is not set");
+        return NULL;
+    }
+
+	struct sockaddr_in serv_addr;
+    if ( ipaddr(&serv_addr, cfg.bind) ) {
+        ERRF("couldn't lookup bind address (%s)", cfg.bind);
+        return NULL;
+    }
+
     Http* server = malloc(sizeof(Http));
     if (server == NULL) {
         ERRF("Out of memory (requested %zu bytes)", sizeof(Http));
@@ -74,12 +120,6 @@ Http* http_open(HttpCfg cfg, void* userdata)
         free(server);
         return NULL;
 	}
-
-	struct sockaddr_in serv_addr = {
-        .sin_family = AF_INET ,
-	    .sin_port = htons(cfg.port),
-	    .sin_addr = { htonl(INADDR_ANY) }
-    };
 
 	if (bind(server->server_fd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) != 0) {
 	    ERRF("Bind failed: %s", strerror(errno));

@@ -94,12 +94,12 @@ const char *http_header_get(struct HttpRequest const* request, const char *name)
 typedef struct HttpResponse (*Http_fn)(struct HttpRequest request, void* userdata);
 
 typedef struct {
-    uint16_t port;
-    int      reuse;
-    size_t   num_threads;
-    size_t   con_sleep_us;
-    size_t   max_enq_con;
-    Http_fn  handler;
+    char const* bind;
+    int         reuse;
+    size_t      num_threads;
+    size_t      con_sleep_us;
+    size_t      max_enq_con;
+    Http_fn     handler;
 } HttpCfg;
 
 typedef struct Http Http;
