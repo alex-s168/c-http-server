@@ -61,6 +61,10 @@ static bool server_has_encoding(struct HttpRequest request, const char *name) {
 #define FILE_CHUNK_SIZE (1028 * 8)
 
 int http__handle_connection(ServerConnection* con) {
+    if (con->server->cfg.verbose) {
+        LOGF("handling connection");
+    }
+
     FILE *fp = fdopen(con->fd, "r+");
     if (fp == NULL) {
         ERRF("fdopen failed: %s", strerror(errno));
@@ -261,6 +265,10 @@ int http__handle_connection(ServerConnection* con) {
 
     if (accepted_encodings_header)
         free(accepted_encodings_header);
+
+    if (con->server->cfg.verbose) {
+        LOGF("finished handling connection");
+    }
 
     return 0;
 }

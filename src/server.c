@@ -157,8 +157,16 @@ void http_tick(Http* server)
                                 (struct sockaddr *) &client_addr,
                                 &client_addr_len);
     if (connection_fd == -1) {
-        if (errno == EWOULDBLOCK) {
+        typeof(errno) err = errno;
+        if (err == EWOULDBLOCK) {
             usleep((useconds_t) server->cfg.con_sleep_us);
+        }
+        else if (err == EAGAIN) {
+            /* do nothing; next tick will accept() again */
+        } else {
+            char errmsg[128];
+            strerror_r(err, errmsg, sizeof(errmsg));
+            ERRF("error from accept(): %s", errmsg);
         }
     }
     // TODO: extend thread pool to get queue fill amount and sleep if full-ish
@@ -170,6 +178,9 @@ void http_tick(Http* server)
         }
         else {
             server->enq_con ++;
+            if (server->cfg.verbose) {
+                LOGF("accepted connection; now have %zu enqueued connections", server->enq_con);
+            }
             con->server = server;
             con->fd = connection_fd;
             threadpool_add(server->pool, handle_task, con, 0);

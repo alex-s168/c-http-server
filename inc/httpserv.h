@@ -100,6 +100,7 @@ typedef struct {
     size_t      con_sleep_us;
     size_t      max_enq_con;
     Http_fn     handler;
+    int         verbose;
 } HttpCfg;
 
 typedef struct Http Http;
