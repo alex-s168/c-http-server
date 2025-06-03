@@ -146,6 +146,7 @@ Http* http_open(HttpCfg cfg, void* userdata)
 void http_tick(Http* server)
 {
     if (server->enq_con >= server->cfg.max_enq_con) {
+        WARNF("not accepting new connections: connection limit reached");
         usleep((useconds_t) server->cfg.con_sleep_us);
         return;
     }
@@ -162,13 +163,13 @@ void http_tick(Http* server)
     }
     // TODO: extend thread pool to get queue fill amount and sleep if full-ish
     else {
-        server->enq_con ++;
         ServerConnection* con = malloc(sizeof(ServerConnection));
         if (con == NULL) {
             close(connection_fd);
             ERRF("out of memory at begin of handling connection");
         }
         else {
+            server->enq_con ++;
             con->server = server;
             con->fd = connection_fd;
             threadpool_add(server->pool, handle_task, con, 0);

@@ -1,6 +1,7 @@
 #include "internal.h"
 #include <errno.h>
 #include <string.h>
+#include <unistd.h>
 
 // from: https://github.com/alex-s168/minilibs/blob/main/filelib.h
 static char *readLine(FILE *file)
@@ -63,18 +64,20 @@ int http__handle_connection(ServerConnection* con) {
     FILE *fp = fdopen(con->fd, "r+");
     if (fp == NULL) {
         ERRF("fdopen failed: %s", strerror(errno));
+        close(con->fd);
         return 1;
     }
-    char *line0 = readLine(fp);
+    char* const line0 = readLine(fp);
     if (line0 == NULL) {
-        ERRF("in request: no line 0");
+        ERRF("empty request");
         fclose(fp);
         return 1;
     }
 
     char *path = strchr(line0, ' ');
     if (path == NULL) {
-        ERRF("in request: invalid line 0");
+        ERRF("in request: empty first line");
+        free(line0);
         fclose(fp);
         return 1;
     }
@@ -84,6 +87,7 @@ int http__handle_connection(ServerConnection* con) {
     char *path_end = strrchr(path, ' ');
     if (path_end == NULL) {
         ERRF("in request: invalid line 0");
+        free(line0);
         fclose(fp);
         return 1;   
     }
@@ -105,16 +109,39 @@ int http__handle_connection(ServerConnection* con) {
     struct Header *headers = NULL;
     size_t headers_size = 0;
 
-    char *line;
-    while ((line = readLine(fp)) != NULL) {
-        if (line[0] == '\0' || feof(fp))
-            break;
-        headers_size++;
-        headers = realloc(headers, headers_size * sizeof(struct Header));
-        char *col = strchr(line, ':');
-        *col = '\0';
-        headers[headers_size - 1].name = line;
-        headers[headers_size - 1].value = col + 2;
+    {
+        char *line;
+        while ((line = readLine(fp)) != NULL) {
+            if (line[0] == '\0' || feof(fp)) {
+                free(line);
+                break;
+            }
+            char *col = strchr(line, ':');
+            if (!col) {
+                free(line);
+                break;
+            }
+
+            if (headers_size + 1 < headers_size) {
+                ERRF("too many headers in request. probably malicisious");
+                free(line);
+                break;
+            }
+            headers_size++;
+            void* newHeaders = realloc(headers, headers_size * sizeof(struct Header));
+            if (!newHeaders) {
+                free(headers);
+                free(line);
+                ERRF("not enough memory for request");
+                fclose(fp);
+                free(line0);
+                return 1;
+            }
+            headers = newHeaders;
+            *col = '\0';
+            headers[headers_size - 1].name = line;
+            headers[headers_size - 1].value = col + 2;
+        }
     }
 
     struct HttpRequest request = { method, path, headers, headers_size, NULL, 0, NULL, 0 };
@@ -136,10 +163,12 @@ int http__handle_connection(ServerConnection* con) {
         size_t content_length = atoi(content_length_header);
 
         char *content = malloc(content_length);
-        fread(content, 1, content_length, fp);
+        if (content) {
+            fread(content, 1, content_length, fp);
 
-        request.body = content;
-        request.body_size = content_length;
+            request.body = content;
+            request.body_size = content_length;
+        }
     }
 
     struct HttpResponse response =

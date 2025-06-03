@@ -116,7 +116,7 @@ void http_slowlyStop(Http* server);
 bool http_isStopping(Http* server);
 
 /** chechks the extension of path; if it can't figure it out, always defaults to text/plain */
-const char* http_detectMime(const char* path);
+const char* http_detectMime(const char* path, char const* default_mine);
 
 size_t http_urldecode(char *dst, size_t dstlen, const char *src);
 

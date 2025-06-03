@@ -1,6 +1,7 @@
 #include <string.h>
+#include "../inc/httpserv.h"
 
-const char* http_detectMime(const char* path)
+const char* http_detectMime(const char* path, const char* default_mine)
 {
     const char* lastSlash = strrchr(path, '/');
     if (lastSlash) path = lastSlash + 1;
@@ -59,6 +60,7 @@ const char* http_detectMime(const char* path)
         else if (!strcmp(ext, "sh")) return "application/x-sh";
         else if (!strcmp(ext, "svg")) return "image/svg+xml";
         else if (!strcmp(ext, "tar")) return "application/x-tar";
+        else if (!strcmp(ext, "tar.xz")) return "application/x-tar";
         else if (!strcmp(ext, "tiff")) return "image/tiff";
         else if (!strcmp(ext, "ts")) return "video/mp2t";
         else if (!strcmp(ext, "ttf")) return "font/ttf";
@@ -78,5 +80,5 @@ const char* http_detectMime(const char* path)
         else if (!strcmp(ext, "7z")) return "application/x-7z-compressed";
 
     }
-    return "text/plain";
+    return default_mine;
 }
